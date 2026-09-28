@@ -108,25 +108,6 @@ flowchart LR
 
 ---
 
-## 🌐 Cloud Deployment
-
-Project SURGE is fully optimized for static cloud hosting with pre-configured routing fallbacks.
-
-### Deploy to Vercel (Recommended)
-1. Fork or push this repository to GitHub.
-2. Go to [Vercel](https://vercel.com/) and click **"Add New Project"**.
-3. Import `Project-SURGE`. Vercel automatically detects the Vite configuration:
-   - **Framework Preset:** `Vite`
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist`
-4. Click **Deploy**. Configuration is handled via [`vercel.json`](vercel.json).
-
-### Deploy to Netlify
-1. Connect your repository on [Netlify](https://www.netlify.com/).
-2. Netlify uses [`public/_redirects`](public/_redirects) for Single Page App client-side routing.
-3. Set build command to `npm run build` and publish directory to `dist`.
-
----
 
 ## 📍 Pilot Regions
 
