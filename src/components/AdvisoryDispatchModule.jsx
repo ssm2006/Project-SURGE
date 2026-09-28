@@ -149,37 +149,126 @@ export const AdvisoryDispatchModule = ({
     english: 'en-IN'
   };
 
+  // Google Translate TTS language codes (more reliable than Web Speech for Indian languages)
+  const GTTS_LANG_CODES = {
+    odia: 'or',
+    bengali: 'bn',
+    telugu: 'te',
+    tamil: 'ta',
+    hindi: 'hi',
+    english: 'en'
+  };
+
+  // Audio element ref for Google TTS fallback
+  const audioRef = React.useRef(null);
+
+  // Play via Google Translate TTS (works for all Indian languages)
+  const playGoogleTTS = (text, lang) => {
+    // Google TTS has a ~200 char limit per request, so split long texts
+    const maxLen = 190;
+    const chunks = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxLen) {
+        chunks.push(remaining);
+        break;
+      }
+      // Find last sentence break within limit
+      let splitAt = remaining.lastIndexOf('।', maxLen);
+      if (splitAt === -1) splitAt = remaining.lastIndexOf('.', maxLen);
+      if (splitAt === -1) splitAt = remaining.lastIndexOf(' ', maxLen);
+      if (splitAt === -1) splitAt = maxLen;
+      chunks.push(remaining.slice(0, splitAt + 1));
+      remaining = remaining.slice(splitAt + 1).trim();
+    }
+
+    const gttsLang = GTTS_LANG_CODES[lang] || 'en';
+    let currentChunk = 0;
+
+    const playNext = () => {
+      if (currentChunk >= chunks.length) {
+        setIsPlayingVoice(false);
+        return;
+      }
+      const encoded = encodeURIComponent(chunks[currentChunk]);
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${gttsLang}&client=tw-ob&q=${encoded}`;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.playbackRate = 0.9;
+      audio.onended = () => {
+        currentChunk++;
+        playNext();
+      };
+      audio.onerror = () => {
+        // If Google TTS fails, fall back to Web Speech API
+        console.warn('Google TTS failed for chunk, falling back to speechSynthesis');
+        const utterance = new SpeechSynthesisUtterance(chunks.slice(currentChunk).join(' '));
+        utterance.lang = LANGUAGE_CODES[selectedLanguage] || 'en-IN';
+        utterance.rate = 0.85;
+        utterance.onend = () => setIsPlayingVoice(false);
+        utterance.onerror = () => setIsPlayingVoice(false);
+        window.speechSynthesis.speak(utterance);
+      };
+      audio.play().catch(() => {
+        // If autoplay blocked, fall back to speechSynthesis
+        const utterance = new SpeechSynthesisUtterance(advisoryContent.ivrScript);
+        utterance.lang = LANGUAGE_CODES[selectedLanguage] || 'en-IN';
+        utterance.rate = 0.85;
+        utterance.onend = () => setIsPlayingVoice(false);
+        utterance.onerror = () => setIsPlayingVoice(false);
+        window.speechSynthesis.speak(utterance);
+      });
+    };
+
+    playNext();
+  };
+
   // Web Speech API for IVR Script Audio Playback
   const handleToggleVoice = () => {
-    if (!('speechSynthesis' in window)) {
-      alert('Speech Synthesis not supported by your browser.');
+    if (isPlayingVoice) {
+      // Stop any active playback
+      window.speechSynthesis?.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setIsPlayingVoice(false);
       return;
     }
 
-    if (isPlayingVoice) {
-      window.speechSynthesis.cancel();
-      setIsPlayingVoice(false);
-    } else {
-      // Use pre-loaded voices to find best match for the selected language
-      const langCode = LANGUAGE_CODES[selectedLanguage] || 'en-IN';
-      const primaryLang = langCode.split('-')[0]; // e.g. 'hi' from 'hi-IN'
+    const langCode = LANGUAGE_CODES[selectedLanguage] || 'en-IN';
+    const primaryLang = langCode.split('-')[0];
 
-      // Find a matching voice: first try exact locale, then language family, then default
-      const matchedVoice =
-        availableVoices.find(v => v.lang === langCode) ||
-        availableVoices.find(v => v.lang.startsWith(primaryLang)) ||
-        availableVoices.find(v => v.lang.startsWith('en')) ||
-        null;
+    // Check if a native Web Speech voice exists for this language
+    const voices = window.speechSynthesis?.getVoices() || [];
+    const voicePool = voices.length > 0 ? voices : availableVoices;
+    const nativeVoice =
+      voicePool.find(v => v.lang === langCode) ||
+      voicePool.find(v => v.lang.startsWith(primaryLang)) ||
+      null;
 
+    setIsPlayingVoice(true);
+
+    if (nativeVoice) {
+      // Use native Web Speech API with the matched voice
       const utterance = new SpeechSynthesisUtterance(advisoryContent.ivrScript);
       utterance.lang = langCode;
-      utterance.rate = 0.88;
+      utterance.voice = nativeVoice;
+      utterance.rate = 0.85;
       utterance.pitch = 1.0;
-      if (matchedVoice) utterance.voice = matchedVoice;
       utterance.onend = () => setIsPlayingVoice(false);
-      utterance.onerror = () => setIsPlayingVoice(false);
-      window.speechSynthesis.speak(utterance);
-      setIsPlayingVoice(true);
+      utterance.onerror = () => {
+        // If native voice errors, try Google TTS
+        playGoogleTTS(advisoryContent.ivrScript, selectedLanguage);
+      };
+      setTimeout(() => window.speechSynthesis.speak(utterance), 50);
+    } else {
+      // No native voice found — use Google Translate TTS which supports all Indian languages
+      playGoogleTTS(advisoryContent.ivrScript, selectedLanguage);
     }
   };
 
@@ -433,11 +522,13 @@ export const AdvisoryDispatchModule = ({
                   </span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
-                  Targeting 14,000 feature phone landlines via BSNL / Jio automated telephony dialer.
-                  {availableVoices.find(v => v.lang.startsWith((LANGUAGE_CODES[selectedLanguage] || 'en').split('-')[0]))
-                    ? <span style={{ color: '#059669', fontWeight: 600 }}> ✓ Native voice available.</span>
-                    : <span style={{ color: '#d97706' }}> ⚠ No native {selectedLanguage} voice installed — browser will use closest available voice. Install OS language packs for full regional audio.</span>
+                  Voice Engine: {availableVoices.find(v => v.lang.startsWith((LANGUAGE_CODES[selectedLanguage] || 'en').split('-')[0]))
+                    ? <span style={{ color: '#059669', fontWeight: 600 }}>✓ Native OS voice detected — using system TTS.</span>
+                    : <span style={{ color: '#2563eb', fontWeight: 600 }}>⟳ Using Google Translate TTS for {selectedLanguage} audio (no native voice installed).</span>
                   }
+                  <span style={{ display: 'block', marginTop: '4px' }}>
+                    Targeting 14,000 feature phone landlines via BSNL / Jio automated telephony dialer.
+                  </span>
                 </div>
               </div>
             </div>
