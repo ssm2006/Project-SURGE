@@ -13,18 +13,9 @@ import {
   Cpu,
   BarChart2,
   ArrowRight,
-  Clock,
-  Users,
   CheckCircle,
   Star
 } from 'lucide-react';
-
-const STATS = [
-  { label: 'Lead-Time Window', value: '72', unit: 'hours', icon: Clock, color: '#0284c7' },
-  { label: 'Population Coverage', value: '4.2', unit: 'million', icon: Users, color: '#059669' },
-  { label: 'Forecast Accuracy', value: '94', unit: '%', icon: BarChart2, color: '#7c3aed' },
-  { label: 'Risk Zones Mapped', value: '280', unit: 'zones', icon: Map, color: '#ea580c' }
-];
 
 const FEATURES = [
   {
@@ -117,46 +108,7 @@ const WORKFLOW_STEPS = [
   }
 ];
 
-// Animated counter hook
-function useCounter(target, duration = 1400) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const isFloat = String(target).includes('.');
-    const numTarget = parseFloat(target);
-    if (isNaN(numTarget)) return;
-    const steps = 60;
-    const increment = numTarget / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= numTarget) {
-        setCount(numTarget);
-        clearInterval(timer);
-      } else {
-        setCount(isFloat ? parseFloat(current.toFixed(1)) : Math.floor(current));
-      }
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [target, duration]);
-  return count;
-}
 
-const StatCard = ({ stat, index }) => {
-  const count = useCounter(parseFloat(stat.value));
-  const Icon = stat.icon;
-  return (
-    <div className="landing-stat-card" style={{ animationDelay: `${index * 0.1}s` }}>
-      <div className="landing-stat-icon" style={{ background: stat.color + '18', color: stat.color }}>
-        <Icon size={22} />
-      </div>
-      <div className="landing-stat-value" style={{ color: stat.color }}>
-        {count}
-        <span className="landing-stat-unit">{stat.unit}</span>
-      </div>
-      <div className="landing-stat-label">{stat.label}</div>
-    </div>
-  );
-};
 
 export const LandingPage = ({ onEnter }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -252,10 +204,7 @@ export const LandingPage = ({ onEnter }) => {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="landing-stats">
-        {STATS.map((stat, i) => <StatCard key={stat.label} stat={stat} index={i} />)}
-      </section>
+
 
       {/* Pilot Regions Ribbon */}
       <section className="landing-regions">
