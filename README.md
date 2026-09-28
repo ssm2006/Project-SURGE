@@ -125,7 +125,7 @@ flowchart LR
 - **Frontend Core:** React 19, JavaScript (ESNext)
 - **Bundler & Dev Server:** Vite 6
 - **Styling:** Modular Light Theme Design System (CSS3 with modern design tokens)
-- **Geospatial & Maps:** Leaflet & OpenStreetMap tiles
+- **Geospatial & Maps:** Google Earth Engine(GEE), Leaflet & OpenStreetMap tiles
 - **Icons:** Lucide React
 - **Voice / Audio Synthesis:** Web Speech API & Multilingual TTS
 - **AI Decision Support:** Google Gemini 3.7 Flash Integration Architecture
