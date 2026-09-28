@@ -11,6 +11,7 @@ import { OfflineOutboxModal } from './components/OfflineOutboxModal';
 import { BacktestModal } from './components/BacktestModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
 import { FutureScopeModal } from './components/FutureScopeModal';
+import { LandingPage } from './components/LandingPage';
 
 import {
   PILOT_REGIONS,
@@ -25,6 +26,9 @@ import {
 import { evaluateCascadeFailures } from './services/cascadeEngine';
 
 export function App() {
+  // Landing page state — show landing first
+  const [showLanding, setShowLanding] = useState(true);
+
   // Navigation & Role State
   const [activeRole, setActiveRole] = useState('DMO');
   const [activeTab, setActiveTab] = useState('dmo');
@@ -140,6 +144,11 @@ export function App() {
   const handleClearOutboxItem = (id) => {
     setOutboxItems(outboxItems.filter(item => item.id !== id));
   };
+
+  // Show landing page until user clicks Enter
+  if (showLanding) {
+    return <LandingPage onEnter={() => setShowLanding(false)} />;
+  }
 
   return (
     <div className="app-container">

@@ -37,6 +37,18 @@ export const AdvisoryDispatchModule = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
+
+  // Preload Web Speech API voices (Chrome loads them async)
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      setAvailableVoices(voices);
+    };
+    loadVoices();
+    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices);
+    return () => window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices);
+  }, []);
 
   // Advisory content state
   const [advisoryContent, setAdvisoryContent] = useState({
@@ -127,6 +139,16 @@ export const AdvisoryDispatchModule = ({
     }
   };
 
+  // BCP-47 language codes for Web Speech API
+  const LANGUAGE_CODES = {
+    odia: 'or-IN',
+    bengali: 'bn-IN',
+    telugu: 'te-IN',
+    tamil: 'ta-IN',
+    hindi: 'hi-IN',
+    english: 'en-IN'
+  };
+
   // Web Speech API for IVR Script Audio Playback
   const handleToggleVoice = () => {
     if (!('speechSynthesis' in window)) {
@@ -138,9 +160,22 @@ export const AdvisoryDispatchModule = ({
       window.speechSynthesis.cancel();
       setIsPlayingVoice(false);
     } else {
+      // Use pre-loaded voices to find best match for the selected language
+      const langCode = LANGUAGE_CODES[selectedLanguage] || 'en-IN';
+      const primaryLang = langCode.split('-')[0]; // e.g. 'hi' from 'hi-IN'
+
+      // Find a matching voice: first try exact locale, then language family, then default
+      const matchedVoice =
+        availableVoices.find(v => v.lang === langCode) ||
+        availableVoices.find(v => v.lang.startsWith(primaryLang)) ||
+        availableVoices.find(v => v.lang.startsWith('en')) ||
+        null;
+
       const utterance = new SpeechSynthesisUtterance(advisoryContent.ivrScript);
-      utterance.rate = 0.95;
+      utterance.lang = langCode;
+      utterance.rate = 0.88;
       utterance.pitch = 1.0;
+      if (matchedVoice) utterance.voice = matchedVoice;
       utterance.onend = () => setIsPlayingVoice(false);
       utterance.onerror = () => setIsPlayingVoice(false);
       window.speechSynthesis.speak(utterance);
@@ -387,10 +422,22 @@ export const AdvisoryDispatchModule = ({
                 onChange={(e) => setAdvisoryContent({ ...advisoryContent, ivrScript: e.target.value })}
               />
 
-              <div style={{ background: '#f1f5f9', padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: isPlayingVoice ? '#059669' : '#94a3b8' }}></div>
-                <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+              <div style={{ background: '#f1f5f9', padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '6px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isPlayingVoice ? '#059669' : '#94a3b8', flexShrink: 0 }}></div>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                    {isPlayingVoice ? 'Broadcasting...' : 'Ready to Broadcast'}
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 6px', fontFamily: 'monospace', marginLeft: 'auto' }}>
+                    {LANGUAGE_CODES[selectedLanguage] || 'en-IN'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
                   Targeting 14,000 feature phone landlines via BSNL / Jio automated telephony dialer.
+                  {availableVoices.find(v => v.lang.startsWith((LANGUAGE_CODES[selectedLanguage] || 'en').split('-')[0]))
+                    ? <span style={{ color: '#059669', fontWeight: 600 }}> ✓ Native voice available.</span>
+                    : <span style={{ color: '#d97706' }}> ⚠ No native {selectedLanguage} voice installed — browser will use closest available voice. Install OS language packs for full regional audio.</span>
+                  }
                 </div>
               </div>
             </div>
